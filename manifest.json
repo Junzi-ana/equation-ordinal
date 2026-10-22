@@ -1,0 +1,10 @@
+{
+	"id": "equation-ordinal",
+	"name": "Equation Ordinal",
+	"version": "1.0.0",
+	"minAppVersion": "1.5.0",
+	"description": "Automatic equation numbering and cross-references for display math. Write \\label and \\ref, get numbered tags at render time — the note itself stays standard LaTeX.",
+	"author": "Junzi-ana",
+	"authorUrl": "https://github.com/Junzi-ana",
+	"isDesktopOnly": false
+}

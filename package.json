@@ -1,0 +1,25 @@
+{
+	"name": "equation-ordinal",
+	"version": "1.0.0",
+	"description": "Automatic equation numbering and cross-references for Obsidian display math, applied at render time",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "node esbuild.config.mjs production",
+		"typecheck": "tsc --noEmit",
+		"test": "node --test \"test/*.test.ts\""
+	},
+	"keywords": [
+		"obsidian",
+		"obsidian-plugin",
+		"latex",
+		"mathjax",
+		"equation-numbering",
+		"cross-reference"
+	],
+	"license": "MIT",
+	"devDependencies": {
+		"esbuild": "^0.28.2",
+		"obsidian": "^1.8.7",
+		"typescript": "^5.6.3"
+	}
+}
