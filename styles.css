@@ -1,10 +1,5 @@
 /*
  * Equation Ordinal
  *
- * 错误标记由 MathJax 的 \color{red} 生成，通常不需要额外样式。
- * 这里只做兜底：万一某些环境下 color 扩展不可用，错误码仍然可见。
+ * 错误标记由 MathJax 的 \color{red} 生成，不需要额外样式。
  */
-
-mjx-container .ordinal-error {
-	color: var(--text-error, #e03131);
-}

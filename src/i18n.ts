@@ -1,14 +1,15 @@
+import { getLanguage } from "obsidian";
+
 /**
  * 极简 i18n：只覆盖插件自己的 UI 文案（命令名、设置面板、Notice、错误说明）。
  *
- * 语言取自 Obsidian 的语言设置（localStorage.language）。
- * 单元测试跑在 node 里，没有 window，自动回落到英文。
+ * 语言取自 Obsidian 界面语言（getLanguage()）。单元测试跑在 node 里，
+ * 没有 Obsidian 运行时会抛错，自动回落到英文。
  */
 
 function currentLanguage(): string {
-	if (typeof window === "undefined") return "en";
 	try {
-		return (window.localStorage.getItem("language") ?? "en").toLowerCase();
+		return getLanguage().toLowerCase();
 	} catch {
 		return "en";
 	}

@@ -33,7 +33,7 @@ __export(main_exports, {
   default: () => EquationOrdinalPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian3 = require("obsidian");
+var import_obsidian4 = require("obsidian");
 var ObsidianNamespace = __toESM(require("obsidian"), 1);
 
 // src/context.ts
@@ -466,10 +466,10 @@ var DocContext = class {
 };
 
 // src/i18n.ts
+var import_obsidian2 = require("obsidian");
 function currentLanguage() {
-  if (typeof window === "undefined") return "en";
   try {
-    return (window.localStorage.getItem("language") ?? "en").toLowerCase();
+    return (0, import_obsidian2.getLanguage)().toLowerCase();
   } catch {
     return "en";
   }
@@ -607,7 +607,7 @@ function rewriteTex(tex, table, options = {}) {
 }
 
 // src/settings.ts
-var import_obsidian2 = require("obsidian");
+var import_obsidian3 = require("obsidian");
 var DEFAULT_SETTINGS = {
   refTemplate: "({n})",
   showErrorInMath: true,
@@ -615,78 +615,99 @@ var DEFAULT_SETTINGS = {
   refreshDebounce: 400,
   debug: false
 };
-var EquationOrdinalSettingTab = class extends import_obsidian2.PluginSettingTab {
+var EquationOrdinalSettingTab = class extends import_obsidian3.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
   }
-  display() {
-    const { containerEl } = this;
-    containerEl.empty();
-    containerEl.createEl("h3", { text: "Equation Ordinal" });
-    new import_obsidian2.Setting(containerEl).setName(t("Reference template", "\u5F15\u7528\u6A21\u677F")).setDesc(
-      t(
-        "How \\ref expands. {n} is replaced by the number. Default: ({n}).",
-        "\\ref \u5C55\u5F00\u6210\u4EC0\u4E48\u3002{n} \u4F1A\u88AB\u66FF\u6362\u6210\u7F16\u53F7\uFF0C\u9ED8\u8BA4 ({n})\u3002"
-      )
-    ).addText(
-      (text) => text.setPlaceholder("({n})").setValue(this.plugin.settings.refTemplate).onChange(async (value) => {
-        this.plugin.settings.refTemplate = value || "({n})";
-        await this.plugin.saveSettings();
-        this.plugin.requestRefresh(true);
-      })
-    );
-    new import_obsidian2.Setting(containerEl).setName(t("Show error codes in formulas", "\u5728\u516C\u5F0F\u5185\u663E\u793A\u9519\u8BEF\u7801")).setDesc(
-      t(
-        "When off, an invalid spot shows a single question mark instead. Details still go to the console.",
-        "\u5173\u95ED\u540E\u9519\u8BEF\u5904\u53EA\u663E\u793A\u4E00\u4E2A ?\uFF0C\u8BE6\u7EC6\u4FE1\u606F\u4ECD\u7136\u5199\u5165\u63A7\u5236\u53F0\u3002"
-      )
-    ).addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.showErrorInMath).onChange(async (value) => {
-        this.plugin.settings.showErrorInMath = value;
-        await this.plugin.saveSettings();
-        this.plugin.requestRefresh(true);
-      })
-    );
-    new import_obsidian2.Setting(containerEl).setName(t("Refresh when numbering changes", "\u7F16\u53F7\u53D8\u5316\u65F6\u81EA\u52A8\u5237\u65B0")).setDesc(
-      t(
-        "Re-render already displayed formulas when inserting one shifts the ones after it. Turn off to reduce flicker.",
-        "\u5728\u6587\u6863\u4E2D\u63D2\u5165\u65B0\u516C\u5F0F\u5BFC\u81F4\u540E\u7EED\u7F16\u53F7\u53D8\u5316\u65F6\uFF0C\u4E3B\u52A8\u91CD\u6E32\u5DF2\u663E\u793A\u7684\u516C\u5F0F\u3002\u5173\u95ED\u53EF\u51CF\u5C11\u95EA\u70C1\u3002"
-      )
-    ).addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.refreshOnChange).onChange(async (value) => {
-        this.plugin.settings.refreshOnChange = value;
-        await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian2.Setting(containerEl).setName(t("Refresh debounce", "\u5237\u65B0\u9632\u6296")).setDesc(
-      t(
-        "How long to wait after typing stops, in milliseconds.",
-        "\u7F16\u8F91\u505C\u6B62\u591A\u4E45\u540E\u89E6\u53D1\u5237\u65B0\uFF08\u6BEB\u79D2\uFF09\u3002"
-      )
-    ).addText(
-      (text) => text.setPlaceholder("400").setValue(String(this.plugin.settings.refreshDebounce)).onChange(async (value) => {
-        const n = Number(value);
-        if (Number.isFinite(n) && n >= 0) {
-          this.plugin.settings.refreshDebounce = Math.min(
-            5e3,
-            Math.max(0, Math.round(n))
-          );
-          await this.plugin.saveSettings();
+  getSettingDefinitions() {
+    return [
+      {
+        name: t("Reference template", "\u5F15\u7528\u6A21\u677F"),
+        desc: t(
+          "How \\ref expands. {n} is replaced by the number. Default: ({n}).",
+          "\\ref \u5C55\u5F00\u6210\u4EC0\u4E48\u3002{n} \u4F1A\u88AB\u66FF\u6362\u6210\u7F16\u53F7\uFF0C\u9ED8\u8BA4 ({n})\u3002"
+        ),
+        control: {
+          type: "text",
+          key: "refTemplate",
+          placeholder: "({n})",
+          defaultValue: "({n})",
+          validate: (value) => {
+            if (value.includes("{n}")) return;
+            return t('The template must contain "{n}".', "\u6A21\u677F\u5FC5\u987B\u5305\u542B {n}\u3002");
+          }
         }
-      })
-    );
-    new import_obsidian2.Setting(containerEl).setName(t("Debug log", "\u8C03\u8BD5\u65E5\u5FD7")).setDesc(
-      t(
-        "Print every TeX rewrite (before / after) to the console.",
-        "\u5728\u63A7\u5236\u53F0\u6253\u5370\u6BCF\u6B21 TeX \u6539\u5199\u7684\u524D\u540E\u5BF9\u6BD4\u3002"
-      )
-    ).addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.debug).onChange(async (value) => {
-        this.plugin.settings.debug = value;
-        await this.plugin.saveSettings();
-      })
-    );
+      },
+      {
+        name: t("Show error codes in formulas", "\u5728\u516C\u5F0F\u5185\u663E\u793A\u9519\u8BEF\u7801"),
+        desc: t(
+          "When off, an invalid spot shows a single question mark instead. Details still go to the console.",
+          "\u5173\u95ED\u540E\u9519\u8BEF\u5904\u53EA\u663E\u793A\u4E00\u4E2A ?\uFF0C\u8BE6\u7EC6\u4FE1\u606F\u4ECD\u7136\u5199\u5165\u63A7\u5236\u53F0\u3002"
+        ),
+        control: {
+          type: "toggle",
+          key: "showErrorInMath",
+          defaultValue: true
+        }
+      },
+      {
+        name: t("Refresh when numbering changes", "\u7F16\u53F7\u53D8\u5316\u65F6\u81EA\u52A8\u5237\u65B0"),
+        desc: t(
+          "Re-render already displayed formulas when inserting one shifts the ones after it. Turn off to reduce flicker.",
+          "\u5728\u6587\u6863\u4E2D\u63D2\u5165\u65B0\u516C\u5F0F\u5BFC\u81F4\u540E\u7EED\u7F16\u53F7\u53D8\u5316\u65F6\uFF0C\u4E3B\u52A8\u91CD\u6E32\u5DF2\u663E\u793A\u7684\u516C\u5F0F\u3002\u5173\u95ED\u53EF\u51CF\u5C11\u95EA\u70C1\u3002"
+        ),
+        control: {
+          type: "toggle",
+          key: "refreshOnChange",
+          defaultValue: true
+        }
+      },
+      {
+        name: t("Refresh debounce", "\u5237\u65B0\u9632\u6296"),
+        desc: t(
+          "How long to wait after typing stops, in milliseconds.",
+          "\u7F16\u8F91\u505C\u6B62\u591A\u4E45\u540E\u89E6\u53D1\u5237\u65B0\uFF08\u6BEB\u79D2\uFF09\u3002"
+        ),
+        control: {
+          type: "number",
+          key: "refreshDebounce",
+          placeholder: "400",
+          defaultValue: 400,
+          min: 0,
+          max: 5e3,
+          step: 1,
+          validate: (value) => {
+            if (Number.isFinite(value) && value >= 0 && value <= 5e3) return;
+            return t(
+              "Enter a number between 0 and 5000.",
+              "\u8BF7\u8F93\u5165 0 \u5230 5000 \u4E4B\u95F4\u7684\u6570\u5B57\u3002"
+            );
+          }
+        }
+      },
+      {
+        name: t("Debug log", "\u8C03\u8BD5\u65E5\u5FD7"),
+        desc: t(
+          "Print every TeX rewrite (before / after) to the console.",
+          "\u5728\u63A7\u5236\u53F0\u6253\u5370\u6BCF\u6B21 TeX \u6539\u5199\u7684\u524D\u540E\u5BF9\u6BD4\u3002"
+        ),
+        control: {
+          type: "toggle",
+          key: "debug",
+          defaultValue: false
+        }
+      }
+    ];
+  }
+  /** 持久化用户改动；模板与错误码开关影响渲染，改完立即重绘 */
+  async setControlValue(key, value) {
+    const settings = this.plugin.settings;
+    settings[key] = key === "refreshDebounce" ? Math.round(Number(value)) : value;
+    await this.plugin.saveSettings();
+    if (key === "refTemplate" || key === "showErrorInMath") {
+      this.plugin.requestRefresh(true);
+    }
   }
 };
 
@@ -707,7 +728,7 @@ function getLoadMathJax() {
   const ns = ObsidianNamespace;
   return typeof ns.loadMathJax === "function" ? ns.loadMathJax.bind(ObsidianNamespace) : void 0;
 }
-var EquationOrdinalPlugin = class extends import_obsidian3.Plugin {
+var EquationOrdinalPlugin = class extends import_obsidian4.Plugin {
   constructor() {
     super(...arguments);
     this.settings = { ...DEFAULT_SETTINGS };
@@ -774,7 +795,7 @@ var EquationOrdinalPlugin = class extends import_obsidian3.Plugin {
       console.warn(
         `${LOG} MathJax.tex2chtml is unavailable (different Obsidian build?), plugin inactive`
       );
-      new import_obsidian3.Notice(
+      new import_obsidian4.Notice(
         t(
           "Equation Ordinal: could not hook MathJax, plugin is inactive. See the console.",
           "Equation Ordinal\uFF1A\u65E0\u6CD5\u6302\u63A5 MathJax\uFF0C\u63D2\u4EF6\u672A\u751F\u6548\u3002\u8BE6\u89C1\u63A7\u5236\u53F0\u3002"
@@ -784,26 +805,22 @@ var EquationOrdinalPlugin = class extends import_obsidian3.Plugin {
       return;
     }
     this.hookMathJax(mj);
-    if (this.settings.debug) {
-      console.info(`${LOG} hooked MathJax ${mj.version ?? "?"}`);
-    }
     this.requestRefresh(true);
   }
   hookMathJax(mj) {
     const original = mj.tex2chtml;
     this.originalTex2chtml = original;
-    const plugin = this;
-    const patched = function(tex, ...rest) {
+    const patched = (tex, ...rest) => {
       if (typeof tex !== "string") return original.apply(mj, [tex, ...rest]);
       let out = tex;
       try {
-        const snap = plugin.ctx.get();
+        const snap = this.ctx.get();
         if (snap) {
           out = rewriteTex(tex, snap.result, {
-            refTemplate: plugin.settings.refTemplate,
-            showErrors: plugin.settings.showErrorInMath
+            refTemplate: this.settings.refTemplate,
+            showErrors: this.settings.showErrorInMath
           });
-          if (plugin.settings.debug && out !== tex) {
+          if (this.settings.debug && out !== tex) {
             console.debug(`${LOG}
   in : ${tex}
   out: ${out}`);
@@ -882,7 +899,7 @@ var EquationOrdinalPlugin = class extends import_obsidian3.Plugin {
       ),
       callback: () => {
         this.requestRefresh(true);
-        new import_obsidian3.Notice(
+        new import_obsidian4.Notice(
           t(
             "Equation Ordinal: rescanning is done",
             "Equation Ordinal\uFF1A\u5DF2\u91CD\u65B0\u626B\u63CF\u5F53\u524D\u6587\u4EF6"
@@ -902,7 +919,7 @@ var EquationOrdinalPlugin = class extends import_obsidian3.Plugin {
   dumpTable() {
     const snap = this.ctx.refresh();
     if (!snap) {
-      new import_obsidian3.Notice(
+      new import_obsidian4.Notice(
         t("Equation Ordinal: no active file", "Equation Ordinal\uFF1A\u6CA1\u6709\u6D3B\u52A8\u6587\u4EF6")
       );
       return;
@@ -916,19 +933,17 @@ var EquationOrdinalPlugin = class extends import_obsidian3.Plugin {
       });
     }
     if (rows.length === 0) {
-      new import_obsidian3.Notice(
+      new import_obsidian4.Notice(
         t(
           "Equation Ordinal: no \\label in this file",
           "Equation Ordinal\uFF1A\u5F53\u524D\u6587\u4EF6\u6CA1\u6709 \\label"
         )
       );
     } else {
-      console.table(rows);
-      const preview = rows.slice(0, 8).map((row) => `${row.label} -> (${row.number})`).join("\n");
-      const more = rows.length > 8 ? t("\n... (see console)", "\n\u2026\u2026\uFF08\u5B8C\u6574\u5217\u8868\u89C1\u63A7\u5236\u53F0\uFF09") : "";
-      new import_obsidian3.Notice(
+      const lines = rows.map((row) => `${row.label} -> (${row.number})`).join("\n");
+      new import_obsidian4.Notice(
         `${t(`${rows.length} labels`, `${rows.length} \u4E2A label`)}:
-${preview}${more}`,
+${lines}`,
         1e4
       );
     }
@@ -975,7 +990,7 @@ ${preview}${more}`,
     if (!force && sig === this.signature) return;
     this.signature = sig;
     if (!force && !this.settings.refreshOnChange) return;
-    const view = this.app.workspace.getActiveViewOfType(import_obsidian3.MarkdownView);
+    const view = this.app.workspace.getActiveViewOfType(import_obsidian4.MarkdownView);
     if (!view) return;
     if (view.getMode() === "preview") {
       try {

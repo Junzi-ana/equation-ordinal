@@ -145,9 +145,6 @@ export default class EquationOrdinalPlugin extends Plugin {
 		}
 
 		this.hookMathJax(mj);
-		if (this.settings.debug) {
-			console.info(`${LOG} hooked MathJax ${mj.version ?? "?"}`);
-		}
 
 		// 首屏可能在本插件挂接之前就渲染完了，这里补一次
 		this.requestRefresh(true);
@@ -156,24 +153,19 @@ export default class EquationOrdinalPlugin extends Plugin {
 	private hookMathJax(mj: MathJaxLike): void {
 		const original = mj.tex2chtml as Tex2Chtml;
 		this.originalTex2chtml = original;
-		const plugin = this;
 
-		const patched: Tex2Chtml = function (
-			this: unknown,
-			tex: string,
-			...rest: unknown[]
-		): unknown {
+		const patched: Tex2Chtml = (tex: string, ...rest: unknown[]): unknown => {
 			if (typeof tex !== "string") return original.apply(mj, [tex, ...rest]);
 
 			let out = tex;
 			try {
-				const snap = plugin.ctx.get();
+				const snap = this.ctx.get();
 				if (snap) {
 					out = rewriteTex(tex, snap.result, {
-						refTemplate: plugin.settings.refTemplate,
-						showErrors: plugin.settings.showErrorInMath,
+						refTemplate: this.settings.refTemplate,
+						showErrors: this.settings.showErrorInMath,
 					});
-					if (plugin.settings.debug && out !== tex) {
+					if (this.settings.debug && out !== tex) {
 						console.debug(`${LOG}\n  in : ${tex}\n  out: ${out}`);
 					}
 				}
@@ -311,14 +303,11 @@ export default class EquationOrdinalPlugin extends Plugin {
 				),
 			);
 		} else {
-			console.table(rows);
-			const preview = rows
-				.slice(0, 8)
+			const lines = rows
 				.map((row) => `${row.label} -> (${row.number})`)
 				.join("\n");
-			const more = rows.length > 8 ? t("\n... (see console)", "\n……（完整列表见控制台）") : "";
 			new Notice(
-				`${t(`${rows.length} labels`, `${rows.length} 个 label`)}:\n${preview}${more}`,
+				`${t(`${rows.length} labels`, `${rows.length} 个 label`)}:\n${lines}`,
 				10000,
 			);
 		}

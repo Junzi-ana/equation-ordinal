@@ -1,4 +1,8 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import {
+	App,
+	PluginSettingTab,
+	type SettingDefinitionItem,
+} from "obsidian";
 import type EquationOrdinalPlugin from "./main.ts";
 import { t } from "./i18n.ts";
 
@@ -23,6 +27,10 @@ export const DEFAULT_SETTINGS: EquationOrdinalSettings = {
 	debug: false,
 };
 
+/**
+ * 声明式设置页（Obsidian 1.13+）：定义一次，框架负责渲染与设置搜索索引。
+ * 读写经 getControlValue / setControlValue 落到 plugin.settings。
+ */
 export class EquationOrdinalSettingTab extends PluginSettingTab {
 	plugin: EquationOrdinalPlugin;
 
@@ -31,103 +39,95 @@ export class EquationOrdinalSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
-	display(): void {
-		const { containerEl } = this;
-		containerEl.empty();
-
-		containerEl.createEl("h3", { text: "Equation Ordinal" });
-
-		new Setting(containerEl)
-			.setName(t("Reference template", "引用模板"))
-			.setDesc(
-				t(
+	getSettingDefinitions(): SettingDefinitionItem[] {
+		return [
+			{
+				name: t("Reference template", "引用模板"),
+				desc: t(
 					"How \\ref expands. {n} is replaced by the number. Default: ({n}).",
 					"\\ref 展开成什么。{n} 会被替换成编号，默认 ({n})。",
 				),
-			)
-			.addText((text) =>
-				text
-					.setPlaceholder("({n})")
-					.setValue(this.plugin.settings.refTemplate)
-					.onChange(async (value) => {
-						this.plugin.settings.refTemplate = value || "({n})";
-						await this.plugin.saveSettings();
-						this.plugin.requestRefresh(true);
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName(t("Show error codes in formulas", "在公式内显示错误码"))
-			.setDesc(
-				t(
+				control: {
+					type: "text",
+					key: "refTemplate",
+					placeholder: "({n})",
+					defaultValue: "({n})",
+					validate: (value: string) => {
+						if (value.includes("{n}")) return;
+						return t('The template must contain "{n}".', "模板必须包含 {n}。");
+					},
+				},
+			},
+			{
+				name: t("Show error codes in formulas", "在公式内显示错误码"),
+				desc: t(
 					"When off, an invalid spot shows a single question mark instead. Details still go to the console.",
 					"关闭后错误处只显示一个 ?，详细信息仍然写入控制台。",
 				),
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.showErrorInMath)
-					.onChange(async (value) => {
-						this.plugin.settings.showErrorInMath = value;
-						await this.plugin.saveSettings();
-						this.plugin.requestRefresh(true);
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName(t("Refresh when numbering changes", "编号变化时自动刷新"))
-			.setDesc(
-				t(
+				control: {
+					type: "toggle",
+					key: "showErrorInMath",
+					defaultValue: true,
+				},
+			},
+			{
+				name: t("Refresh when numbering changes", "编号变化时自动刷新"),
+				desc: t(
 					"Re-render already displayed formulas when inserting one shifts the ones after it. Turn off to reduce flicker.",
 					"在文档中插入新公式导致后续编号变化时，主动重渲已显示的公式。关闭可减少闪烁。",
 				),
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.refreshOnChange)
-					.onChange(async (value) => {
-						this.plugin.settings.refreshOnChange = value;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName(t("Refresh debounce", "刷新防抖"))
-			.setDesc(
-				t(
+				control: {
+					type: "toggle",
+					key: "refreshOnChange",
+					defaultValue: true,
+				},
+			},
+			{
+				name: t("Refresh debounce", "刷新防抖"),
+				desc: t(
 					"How long to wait after typing stops, in milliseconds.",
 					"编辑停止多久后触发刷新（毫秒）。",
 				),
-			)
-			.addText((text) =>
-				text
-					.setPlaceholder("400")
-					.setValue(String(this.plugin.settings.refreshDebounce))
-					.onChange(async (value) => {
-						const n = Number(value);
-						if (Number.isFinite(n) && n >= 0) {
-							this.plugin.settings.refreshDebounce = Math.min(
-								5000,
-								Math.max(0, Math.round(n)),
-							);
-							await this.plugin.saveSettings();
-						}
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName(t("Debug log", "调试日志"))
-			.setDesc(
-				t(
+				control: {
+					type: "number",
+					key: "refreshDebounce",
+					placeholder: "400",
+					defaultValue: 400,
+					min: 0,
+					max: 5000,
+					step: 1,
+					validate: (value: number) => {
+						if (Number.isFinite(value) && value >= 0 && value <= 5000) return;
+						return t(
+							"Enter a number between 0 and 5000.",
+							"请输入 0 到 5000 之间的数字。",
+						);
+					},
+				},
+			},
+			{
+				name: t("Debug log", "调试日志"),
+				desc: t(
 					"Print every TeX rewrite (before / after) to the console.",
 					"在控制台打印每次 TeX 改写的前后对比。",
 				),
-			)
-			.addToggle((toggle) =>
-				toggle.setValue(this.plugin.settings.debug).onChange(async (value) => {
-					this.plugin.settings.debug = value;
-					await this.plugin.saveSettings();
-				}),
-			);
+				control: {
+					type: "toggle",
+					key: "debug",
+					defaultValue: false,
+				},
+			},
+		];
+	}
+
+	/** 持久化用户改动；模板与错误码开关影响渲染，改完立即重绘 */
+	async setControlValue(key: string, value: unknown): Promise<void> {
+		const settings = this.plugin.settings as unknown as Record<string, unknown>;
+		settings[key] =
+			key === "refreshDebounce" ? Math.round(Number(value)) : value;
+		await this.plugin.saveSettings();
+		if (key === "refTemplate" || key === "showErrorInMath") {
+			this.plugin.requestRefresh(true);
+		}
 	}
 }
