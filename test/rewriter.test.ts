@@ -43,17 +43,17 @@ test("errors can be silenced", () => {
 	assert.equal(rewriteTex("\\ref{nope}", table, { showErrors: false }), "\\text{?}");
 });
 
-test("tag goes before \\end of an align environment", () => {
+test("tag goes after \\end of an align environment (renders centered by MathJax)", () => {
 	assert.equal(
 		rewriteTex("\\begin{align}a \\label{x}\\end{align}", table),
-		"\\begin{align}a \\tag{1}\\end{align}",
+		"\\begin{align}a \\end{align}\\tag{1}",
 	);
 });
 
-test("tag goes before a trailing line break", () => {
+test("multi-line align with label after \\end keeps the tag at top level", () => {
 	assert.equal(
-		rewriteTex("\\begin{align}a \\\\ b \\label{x}\\end{align}", table),
-		"\\begin{align}a \\\\ b \\tag{1}\\end{align}",
+		rewriteTex("\\begin{align}a\\\\b\\end{align}\\label{x}", table),
+		"\\begin{align}a\\\\b\\end{align}\\tag{1}",
 	);
 });
 

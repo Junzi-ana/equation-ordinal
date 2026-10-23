@@ -4,13 +4,14 @@
  * 输入是即将交给 MathJax 的单个公式字符串，输出改写后的字符串。
  * 必须在同步上下文中完成，所以这里只做字符串操作，不读文件、不 await。
  *
- *   \label{name}[N]  ->  删除，并在正确位置插入 \tag{编号}
+ *   \label{name}[N]  ->  删除，并把 \tag{编号} 追加到公式末尾
  *   \ref{name}       ->  \text{(编号)}      模板可配
  *   \eqref{name}     ->  同上
  *
  * 三个关键设计：
- *   1. label 可以写在公式的任意位置：先删掉，再在顶层末尾
- *      （或 align 类环境的 \end 之前）插入 \tag。
+ *   1. label 可以写在公式的任意位置：先删掉，再追加到顶层末尾。
+ *      MathJax 下 \tag 写在 \end{align} 之后（环境外）会渲染在整个
+ *      多行块的中间右侧；写进环境末尾反而会被算到最后一行。
  *   2. 手写 \tag 一律先删除（label 优先）。
  *   3. 幂等：源文件不变，每次渲染都从原始 TeX 出发改写。
  */
@@ -34,10 +35,6 @@ const FAST = /\\(?:label|ref|eqref)\b/;
 const TAG_RE = /\\tag\*?\s*\{[^{}]*\}/g;
 const LABEL_RE = /\\label\s*\{([^{}]*)\}/g;
 const COUNTER_CANDIDATE = /^[0-9A-Za-z][0-9A-Za-z.]*$/;
-
-/** align 类环境：\tag 必须写在 \end{...} 之前 */
-const TAIL_ENV_RE =
-	/\\end\{(align\*?|alignat\*?|flalign\*?|gather\*?|equation\*?|multline\*?)\}[ \t]*$/;
 
 function errorTex(code: ErrCode, show: boolean): string {
 	if (!show) return "\\text{?}";
@@ -87,30 +84,15 @@ export function stripLabels(tex: string): { tex: string; names: string[] } {
 }
 
 /**
- * 把 tag 插到不会让 MathJax 报错的位置：
- *   - 公式以 align 类环境结尾 -> 插到 \end{...} 之前（若紧跟 \\，插在 \\ 之前）
- *   - 其它（含 cases / aligned 作从属环境）-> 追加到顶层末尾
+ * 把 tag 追加到公式顶层末尾。
  *
- * 对 cases / aligned 这类从属环境，\tag 必须留在顶层，追加到末尾才合法。
+ * 不要插进 \end{align} 之前：MathJax 会把环境内的 \tag 算到最后一个
+ * 行上（tag 跑到最后一行右侧）；而 \end{align} 之后（环境外）的 \tag
+ * 会渲染在整个多行块的中间右侧，与手写 \tag 的行为一致。
  */
 export function insertTag(tex: string, tag: string): string {
 	const body = tex.replace(/\s+$/, "");
 	if (!body) return tag;
-
-	const m = TAIL_ENV_RE.exec(body);
-	if (m) {
-		const token = m[0].trim();
-		const pos = body.length - token.length;
-		const head = body.slice(0, pos);
-		// 避免 tag 落到 \\ 之后产生的空行上
-		const br = /\\\\[ \t]*$/.exec(head);
-		if (br) {
-			const p = pos - br[0].length;
-			return body.slice(0, p) + tag + body.slice(p);
-		}
-		return head + tag + body.slice(pos);
-	}
-
 	return body + tag;
 }
 

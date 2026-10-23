@@ -615,7 +615,6 @@ var FAST = /\\(?:label|ref|eqref)\b/;
 var TAG_RE = /\\tag\*?\s*\{[^{}]*\}/g;
 var LABEL_RE = /\\label\s*\{([^{}]*)\}/g;
 var COUNTER_CANDIDATE2 = /^[0-9A-Za-z][0-9A-Za-z.]*$/;
-var TAIL_ENV_RE = /\\end\{(align\*?|alignat\*?|flalign\*?|gather\*?|equation\*?|multline\*?)\}[ \t]*$/;
 function errorTex(code, show) {
   if (!show) return "\\text{?}";
   return `\\color{red}{\\text{[${code}]}}`;
@@ -653,18 +652,6 @@ function stripLabels(tex) {
 function insertTag(tex, tag) {
   const body = tex.replace(/\s+$/, "");
   if (!body) return tag;
-  const m = TAIL_ENV_RE.exec(body);
-  if (m) {
-    const token = m[0].trim();
-    const pos = body.length - token.length;
-    const head = body.slice(0, pos);
-    const br = /\\\\[ \t]*$/.exec(head);
-    if (br) {
-      const p = pos - br[0].length;
-      return body.slice(0, p) + tag + body.slice(p);
-    }
-    return head + tag + body.slice(pos);
-  }
   return body + tag;
 }
 function rewriteTex(tex, table, options = {}) {
