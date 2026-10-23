@@ -3,3 +3,10 @@
  *
  * 错误标记由 MathJax 的 \color{red} 生成，不需要额外样式。
  */
+
+/* label 补全建议条里的编号副文本 */
+.eq-suggest-number {
+	margin-left: 0.75em;
+	opacity: 0.6;
+	font-size: 0.9em;
+}

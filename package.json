@@ -1,6 +1,6 @@
 {
 	"name": "equation-ordinal",
-	"version": "1.0.0",
+	"version": "1.1.0",
 	"description": "Automatic equation numbering and cross-references for Obsidian display math, applied at render time",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",

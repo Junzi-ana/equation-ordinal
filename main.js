@@ -33,7 +33,7 @@ __export(main_exports, {
   default: () => EquationOrdinalPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian4 = require("obsidian");
+var import_obsidian5 = require("obsidian");
 var ObsidianNamespace = __toESM(require("obsidian"), 1);
 
 // src/context.ts
@@ -517,6 +517,95 @@ function describeError(code) {
   return t(english, chinese);
 }
 
+// src/editor-suggest.ts
+var import_view = require("@codemirror/view");
+var import_obsidian3 = require("obsidian");
+var TRIGGER_RE = /\\(?:eq)?ref\s*\{([^{}]*)$|\\label\s*\{([^{}]*)$/;
+var LabelSuggest = class extends import_obsidian3.EditorSuggest {
+  constructor(app, ctx) {
+    super(app);
+    this.openSig = "";
+    this.ctx = ctx;
+  }
+  /** CM6 扩展：选区/文档变化时检查光标位置（随 registerEditorExtension 注册，卸载自动清理） */
+  cursorWatcher() {
+    const self = this;
+    return import_view.ViewPlugin.fromClass(
+      class {
+        update(update) {
+          if (!update.selectionSet && !update.docChanged) return;
+          const info = update.view.state.field(import_obsidian3.editorInfoField, false);
+          if (info?.editor) self.handleCursorActivity(info.editor, info.file);
+        }
+      }
+    );
+  }
+  handleCursorActivity(editor, file) {
+    if (!file) {
+      if (this.openSig) {
+        this.openSig = "";
+        this.close();
+      }
+      return;
+    }
+    const cursor = editor.getCursor();
+    const trigger = this.onTrigger(cursor, editor, file);
+    if (!trigger) {
+      if (this.openSig) {
+        this.openSig = "";
+        this.close();
+      }
+      return;
+    }
+    const sig = `${file.path}:${trigger.start.line}:${trigger.start.ch}:${trigger.query}`;
+    if (sig === this.openSig) return;
+    this.openSig = sig;
+    this.context = {
+      editor,
+      file,
+      start: trigger.start,
+      end: trigger.end,
+      query: trigger.query
+    };
+    this.open();
+  }
+  getSuggestions(context) {
+    const snap = this.ctx.get();
+    if (!snap) return [];
+    const q = context.query;
+    const results = [];
+    for (const entry of snap.result.labels.values()) {
+      if (q && !entry.name.includes(q)) continue;
+      results.push(entry);
+    }
+    return results;
+  }
+  renderSuggestion(entry, el) {
+    el.createSpan({ text: entry.name, cls: "eq-suggest-name" });
+    if (entry.number) {
+      el.createSpan({ text: entry.number, cls: "eq-suggest-number" });
+    }
+  }
+  selectSuggestion(entry, evt) {
+    const { editor, start, end } = this.context;
+    editor.replaceRange(entry.name, start, end);
+    editor.setCursor(end.line, start.ch + entry.name.length);
+  }
+  onTrigger(cursor, editor, file) {
+    const upto = editor.getLine(cursor.line).slice(0, cursor.ch);
+    const m = TRIGGER_RE.exec(upto);
+    if (!m) return null;
+    const captured = m[1] ?? m[2];
+    const snap = this.ctx.get();
+    if (!snap || snap.result.labels.size === 0) return null;
+    return {
+      start: { line: cursor.line, ch: cursor.ch - captured.length },
+      end: cursor,
+      query: captured
+    };
+  }
+};
+
 // src/rewriter.ts
 var DEFAULT_REWRITE_OPTIONS = {
   refTemplate: "({n})",
@@ -607,7 +696,7 @@ function rewriteTex(tex, table, options = {}) {
 }
 
 // src/settings.ts
-var import_obsidian3 = require("obsidian");
+var import_obsidian4 = require("obsidian");
 var DEFAULT_SETTINGS = {
   refTemplate: "({n})",
   showErrorInMath: true,
@@ -615,7 +704,7 @@ var DEFAULT_SETTINGS = {
   refreshDebounce: 400,
   debug: false
 };
-var EquationOrdinalSettingTab = class extends import_obsidian3.PluginSettingTab {
+var EquationOrdinalSettingTab = class extends import_obsidian4.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -728,7 +817,7 @@ function getLoadMathJax() {
   const ns = ObsidianNamespace;
   return typeof ns.loadMathJax === "function" ? ns.loadMathJax.bind(ObsidianNamespace) : void 0;
 }
-var EquationOrdinalPlugin = class extends import_obsidian4.Plugin {
+var EquationOrdinalPlugin = class extends import_obsidian5.Plugin {
   constructor() {
     super(...arguments);
     this.settings = { ...DEFAULT_SETTINGS };
@@ -741,6 +830,9 @@ var EquationOrdinalPlugin = class extends import_obsidian4.Plugin {
     await this.loadSettings();
     this.ctx = new DocContext(this.app, () => this.settings.refreshDebounce);
     this.addSettingTab(new EquationOrdinalSettingTab(this.app, this));
+    this.labelSuggest = new LabelSuggest(this.app, this.ctx);
+    this.registerEditorSuggest(this.labelSuggest);
+    this.registerEditorExtension(this.labelSuggest.cursorWatcher());
     this.registerEvents();
     this.addCommands();
     void this.installHook();
@@ -795,7 +887,7 @@ var EquationOrdinalPlugin = class extends import_obsidian4.Plugin {
       console.warn(
         `${LOG} MathJax.tex2chtml is unavailable (different Obsidian build?), plugin inactive`
       );
-      new import_obsidian4.Notice(
+      new import_obsidian5.Notice(
         t(
           "Equation Ordinal: could not hook MathJax, plugin is inactive. See the console.",
           "Equation Ordinal\uFF1A\u65E0\u6CD5\u6302\u63A5 MathJax\uFF0C\u63D2\u4EF6\u672A\u751F\u6548\u3002\u8BE6\u89C1\u63A7\u5236\u53F0\u3002"
@@ -899,7 +991,7 @@ var EquationOrdinalPlugin = class extends import_obsidian4.Plugin {
       ),
       callback: () => {
         this.requestRefresh(true);
-        new import_obsidian4.Notice(
+        new import_obsidian5.Notice(
           t(
             "Equation Ordinal: rescanning is done",
             "Equation Ordinal\uFF1A\u5DF2\u91CD\u65B0\u626B\u63CF\u5F53\u524D\u6587\u4EF6"
@@ -919,7 +1011,7 @@ var EquationOrdinalPlugin = class extends import_obsidian4.Plugin {
   dumpTable() {
     const snap = this.ctx.refresh();
     if (!snap) {
-      new import_obsidian4.Notice(
+      new import_obsidian5.Notice(
         t("Equation Ordinal: no active file", "Equation Ordinal\uFF1A\u6CA1\u6709\u6D3B\u52A8\u6587\u4EF6")
       );
       return;
@@ -933,7 +1025,7 @@ var EquationOrdinalPlugin = class extends import_obsidian4.Plugin {
       });
     }
     if (rows.length === 0) {
-      new import_obsidian4.Notice(
+      new import_obsidian5.Notice(
         t(
           "Equation Ordinal: no \\label in this file",
           "Equation Ordinal\uFF1A\u5F53\u524D\u6587\u4EF6\u6CA1\u6709 \\label"
@@ -941,7 +1033,7 @@ var EquationOrdinalPlugin = class extends import_obsidian4.Plugin {
       );
     } else {
       const lines = rows.map((row) => `${row.label} -> (${row.number})`).join("\n");
-      new import_obsidian4.Notice(
+      new import_obsidian5.Notice(
         `${t(`${rows.length} labels`, `${rows.length} \u4E2A label`)}:
 ${lines}`,
         1e4
@@ -990,7 +1082,7 @@ ${lines}`,
     if (!force && sig === this.signature) return;
     this.signature = sig;
     if (!force && !this.settings.refreshOnChange) return;
-    const view = this.app.workspace.getActiveViewOfType(import_obsidian4.MarkdownView);
+    const view = this.app.workspace.getActiveViewOfType(import_obsidian5.MarkdownView);
     if (!view) return;
     if (view.getMode() === "preview") {
       try {

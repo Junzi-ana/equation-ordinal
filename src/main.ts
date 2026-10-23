@@ -13,6 +13,7 @@ import * as ObsidianNamespace from "obsidian";
 import { DocContext } from "./context.ts";
 import { describeError } from "./errors.ts";
 import { t } from "./i18n.ts";
+import { LabelSuggest } from "./editor-suggest.ts";
 import { rewriteTex } from "./rewriter.ts";
 import { DEFAULT_SETTINGS, EquationOrdinalSettingTab } from "./settings.ts";
 import type { EquationOrdinalSettings } from "./settings.ts";
@@ -56,6 +57,7 @@ export default class EquationOrdinalPlugin extends Plugin {
 	settings: EquationOrdinalSettings = { ...DEFAULT_SETTINGS };
 
 	private ctx!: DocContext;
+	private labelSuggest!: LabelSuggest;
 	private originalTex2chtml: Tex2Chtml | null = null;
 	private signature = "";
 	private errorSignature = "";
@@ -66,6 +68,9 @@ export default class EquationOrdinalPlugin extends Plugin {
 
 		this.ctx = new DocContext(this.app, () => this.settings.refreshDebounce);
 		this.addSettingTab(new EquationOrdinalSettingTab(this.app, this));
+		this.labelSuggest = new LabelSuggest(this.app, this.ctx);
+		this.registerEditorSuggest(this.labelSuggest);
+		this.registerEditorExtension(this.labelSuggest.cursorWatcher());
 		this.registerEvents();
 		this.addCommands();
 
