@@ -22,16 +22,24 @@ interface CacheEntry {
 	head: string;
 	tail: string;
 	result: ScanResult;
+	/** 最近一次失效时刻；宽限期内沿用旧表，避免打字时反复全文扫描 */
+	invalidatedAt?: number;
 }
 
 export class DocContext {
 	private cache: CacheEntry | null = null;
 	private textCache = new Map<string, { text: string; at: number }>();
 
-	constructor(private app: App) {}
+	constructor(
+		private app: App,
+		getGraceMs?: () => number,
+	) {
+		this.getGraceMs = getGraceMs ?? (() => 0);
+	}
+	private getGraceMs: () => number;
 
 	invalidate(): void {
-		this.cache = null;
+		if (this.cache) this.cache.invalidatedAt = Date.now();
 	}
 
 	/** 预读全文，给阅读视图 / 无 editor 的场景兜底 */
@@ -75,7 +83,7 @@ export class DocContext {
 		return { path: file.path, text };
 	}
 
-	/** 扫描结果（带缓存） */
+	/** 扫描结果（带缓存）。失效后在一个防抖周期内沿用旧表，避免打字时反复全文扫描 */
 	get(): { path: string; result: ScanResult } | null {
 		const snap = this.snapshot();
 		if (!snap || snap.text === null) return null;
@@ -84,14 +92,19 @@ export class DocContext {
 		const head = text.slice(0, 64);
 		const tail = text.slice(-64);
 		const c = this.cache;
-		if (
-			c &&
-			c.path === path &&
-			c.len === text.length &&
-			c.head === head &&
-			c.tail === tail
-		) {
-			return { path, result: c.result };
+		if (c && c.path === path) {
+			if (c.len === text.length && c.head === head && c.tail === tail) {
+				delete c.invalidatedAt;
+				return { path, result: c.result };
+			}
+			const grace = this.getGraceMs();
+			if (
+				grace > 0 &&
+				c.invalidatedAt !== undefined &&
+				Date.now() - c.invalidatedAt < grace
+			) {
+				return { path, result: c.result };
+			}
 		}
 
 		const result = scanDocument(text);

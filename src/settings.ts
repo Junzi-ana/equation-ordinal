@@ -129,28 +129,5 @@ export class EquationOrdinalSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}),
 			);
-
-		containerEl.createEl("h4", { text: t("Syntax", "语法") });
-		const help = containerEl.createEl("div", {
-			cls: "setting-item-description",
-		});
-
-		help.createEl("p", {
-			text: t(
-				"Declare a label inside a display block; the optional [N] resets the counter:",
-				"在行间公式（$$...$$）里声明 label；可选的 [N] 用来重置计数器：",
-			),
-		});
-		help.createEl("pre", {
-			text: "$$\n\\mathrm{d}Y_t = Z_t\\,\\mathrm{d}W_t \\label{eq:bsde}[5.1.10]\n$$",
-		});
-
-		help.createEl("p", {
-			text: t(
-				"Reference it from inline or display math; it expands to (5.1.10):",
-				"在行内或行间公式里引用，会展开成 (5.1.10)：",
-			),
-		});
-		help.createEl("pre", { text: "由 $\\ref{eq:bsde}$ 可得……" });
 	}
 }

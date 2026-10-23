@@ -64,7 +64,7 @@ export default class EquationOrdinalPlugin extends Plugin {
 	async onload(): Promise<void> {
 		await this.loadSettings();
 
-		this.ctx = new DocContext(this.app);
+		this.ctx = new DocContext(this.app, () => this.settings.refreshDebounce);
 		this.addSettingTab(new EquationOrdinalSettingTab(this.app, this));
 		this.registerEvents();
 		this.addCommands();

@@ -394,13 +394,14 @@ function scanDocument(src) {
 
 // src/context.ts
 var DocContext = class {
-  constructor(app) {
+  constructor(app, getGraceMs) {
     this.app = app;
     this.cache = null;
     this.textCache = /* @__PURE__ */ new Map();
+    this.getGraceMs = getGraceMs ?? (() => 0);
   }
   invalidate() {
-    this.cache = null;
+    if (this.cache) this.cache.invalidatedAt = Date.now();
   }
   /** 预读全文，给阅读视图 / 无 editor 的场景兜底 */
   async prewarm(file) {
@@ -435,7 +436,7 @@ var DocContext = class {
     }
     return { path: file.path, text };
   }
-  /** 扫描结果（带缓存） */
+  /** 扫描结果（带缓存）。失效后在一个防抖周期内沿用旧表，避免打字时反复全文扫描 */
   get() {
     const snap = this.snapshot();
     if (!snap || snap.text === null) return null;
@@ -443,8 +444,15 @@ var DocContext = class {
     const head = text.slice(0, 64);
     const tail = text.slice(-64);
     const c = this.cache;
-    if (c && c.path === path && c.len === text.length && c.head === head && c.tail === tail) {
-      return { path, result: c.result };
+    if (c && c.path === path) {
+      if (c.len === text.length && c.head === head && c.tail === tail) {
+        delete c.invalidatedAt;
+        return { path, result: c.result };
+      }
+      const grace = this.getGraceMs();
+      if (grace > 0 && c.invalidatedAt !== void 0 && Date.now() - c.invalidatedAt < grace) {
+        return { path, result: c.result };
+      }
     }
     const result = scanDocument(text);
     this.cache = { path, len: text.length, head, tail, result };
@@ -679,26 +687,6 @@ var EquationOrdinalSettingTab = class extends import_obsidian2.PluginSettingTab 
         await this.plugin.saveSettings();
       })
     );
-    containerEl.createEl("h4", { text: t("Syntax", "\u8BED\u6CD5") });
-    const help = containerEl.createEl("div", {
-      cls: "setting-item-description"
-    });
-    help.createEl("p", {
-      text: t(
-        "Declare a label inside a display block; the optional [N] resets the counter:",
-        "\u5728\u884C\u95F4\u516C\u5F0F\uFF08$$...$$\uFF09\u91CC\u58F0\u660E label\uFF1B\u53EF\u9009\u7684 [N] \u7528\u6765\u91CD\u7F6E\u8BA1\u6570\u5668\uFF1A"
-      )
-    });
-    help.createEl("pre", {
-      text: "$$\n\\mathrm{d}Y_t = Z_t\\,\\mathrm{d}W_t \\label{eq:bsde}[5.1.10]\n$$"
-    });
-    help.createEl("p", {
-      text: t(
-        "Reference it from inline or display math; it expands to (5.1.10):",
-        "\u5728\u884C\u5185\u6216\u884C\u95F4\u516C\u5F0F\u91CC\u5F15\u7528\uFF0C\u4F1A\u5C55\u5F00\u6210 (5.1.10)\uFF1A"
-      )
-    });
-    help.createEl("pre", { text: "\u7531 $\\ref{eq:bsde}$ \u53EF\u5F97\u2026\u2026" });
   }
 };
 
@@ -730,7 +718,7 @@ var EquationOrdinalPlugin = class extends import_obsidian3.Plugin {
   }
   async onload() {
     await this.loadSettings();
-    this.ctx = new DocContext(this.app);
+    this.ctx = new DocContext(this.app, () => this.settings.refreshDebounce);
     this.addSettingTab(new EquationOrdinalSettingTab(this.app, this));
     this.registerEvents();
     this.addCommands();
